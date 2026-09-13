@@ -1,0 +1,22 @@
+name: ventago-homelab
+
+services:
+  orchestrator:
+    build: .
+    container_name: ventago-homelab
+    restart: unless-stopped
+    environment:
+      CONFIG_PATH: /etc/homelab/config.json
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: qwen3.5:4b
+    volumes:
+      - ./configs/config.json:/etc/homelab/config.json:ro
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks:
+      - ventago-lab
+
+networks:
+  ventago-lab:
+    name: ventago-lab_default
+    external: true

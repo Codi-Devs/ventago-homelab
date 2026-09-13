@@ -1,0 +1,10 @@
+{
+  "http_addr": ":8080",
+  "ollama_host": "http://ollama:11434",
+  "ollama_model": "qwen3.5:4b",
+  "workers": {
+    "nr_monitor": { "enabled": false },
+    "morning_digest": { "enabled": false },
+    "ocr": { "enabled": false }
+  }
+}
