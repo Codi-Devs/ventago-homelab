@@ -1,6 +1,24 @@
 name: ventago-homelab
 
 services:
+  mysql:
+    image: mysql:8.0
+    container_name: ventago-homelab-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: homelab_ocr
+      MYSQL_USER: ocr
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-ocr_local}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-ocr_root_local}
+    ports:
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - homelab_mysql:/var/lib/mysql
+      - ./scripts/mysql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - ventago-lab
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+
   orchestrator:
     build: .
     container_name: ventago-homelab
@@ -9,12 +27,24 @@ services:
       CONFIG_PATH: /etc/homelab/config.json
       OLLAMA_HOST: http://ollama:11434
       OLLAMA_MODEL: qwen3.5:4b
+      VENTAGO_API_BASE: ${VENTAGO_API_BASE:-}
+      HOMELAB_OCR_API_KEY: ${HOMELAB_OCR_API_KEY:-}
+      MYSQL_DSN: ocr:${MYSQL_PASSWORD:-ocr_local}@tcp(mysql:3306)/homelab_ocr?parseTime=true
     volumes:
       - ./configs/config.json:/etc/homelab/config.json:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/ventago-lab/ocr/work:/opt/ventago-lab/ocr/work
+      - ./scripts/paddle_extract.py:/opt/ventago-lab/ocr/work/paddle_extract.py:ro
+      - /sys/class/thermal:/sys/class/thermal:ro
     ports:
       - "127.0.0.1:8080:8080"
+    depends_on:
+      - mysql
     networks:
       - ventago-lab
+
+volumes:
+  homelab_mysql:
 
 networks:
   ventago-lab:

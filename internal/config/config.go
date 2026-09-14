@@ -19,10 +19,14 @@ type Worker struct {
 }
 
 type Config struct {
-	HTTPAddr    string            `json:"http_addr"`
-	OllamaHost  string            `json:"ollama_host"`
-	OllamaModel string            `json:"ollama_model"`
-	Workers     map[string]Worker `json:"workers"`
+	HTTPAddr         string            `json:"http_addr"`
+	OllamaHost       string            `json:"ollama_host"`
+	OllamaModel      string            `json:"ollama_model"`
+	VentagoAPIBase   string            `json:"ventago_api_base"`
+	MySQLDSN         string            `json:"mysql_dsn"`
+	PaddleContainer  string            `json:"paddle_container"`
+	OCRWorkDir       string            `json:"ocr_work_dir"`
+	Workers          map[string]Worker `json:"workers"`
 }
 
 func Load(path string) (Config, error) {
@@ -58,6 +62,18 @@ func (c *Config) applyDefaults() {
 	}
 	if strings.TrimSpace(c.OllamaModel) == "" {
 		c.OllamaModel = DefaultModel
+	}
+	if strings.TrimSpace(c.VentagoAPIBase) == "" {
+		c.VentagoAPIBase = strings.TrimSpace(os.Getenv("VENTAGO_API_BASE"))
+	}
+	if strings.TrimSpace(c.MySQLDSN) == "" {
+		c.MySQLDSN = strings.TrimSpace(os.Getenv("MYSQL_DSN"))
+	}
+	if strings.TrimSpace(c.PaddleContainer) == "" {
+		c.PaddleContainer = "paddleocr"
+	}
+	if strings.TrimSpace(c.OCRWorkDir) == "" {
+		c.OCRWorkDir = "/opt/ventago-lab/ocr/work"
 	}
 	if c.Workers == nil {
 		c.Workers = map[string]Worker{}

@@ -29,7 +29,7 @@ func New(cfg config.Config) *Server {
 	mux := http.NewServeMux()
 	s := &Server{
 		cfg:     cfg,
-		workers: workers.Catalog(),
+		workers: workers.Catalog(cfg),
 	}
 	mux.HandleFunc("GET /health", s.health)
 	s.http = &http.Server{
@@ -47,11 +47,7 @@ func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
 		Workers: map[string]string{},
 	}
 	for _, wrk := range s.workers {
-		state := "stub_disabled"
-		if s.cfg.WorkerEnabled(wrk.Name()) {
-			state = "stub_enabled"
-		}
-		body.Workers[wrk.Name()] = state
+		body.Workers[wrk.Name()] = workers.StatusLabel(wrk, s.cfg.WorkerEnabled(wrk.Name()))
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(body)
@@ -93,7 +89,7 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 func (s *Server) loop(ctx context.Context) {
-	ticker := time.NewTicker(time.Minute)
+	ticker := time.NewTicker(20 * time.Second)
 	defer ticker.Stop()
 	s.dispatch(ctx)
 	for {

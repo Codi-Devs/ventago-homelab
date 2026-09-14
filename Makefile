@@ -1,7 +1,7 @@
 .PHONY: test build deploy
 
 test:
-	go test ./...
+	CGO_ENABLED=0 go test ./...
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bin/orchestrator ./cmd/orchestrator

@@ -4,8 +4,14 @@ Monorepo Go del orquestador del home lab Tecodigi. Un binario ligero despacha
 los workers (monitor New Relic, digest matutino, OCR y los que se agreguen).
 No es VentaGO productivo ni el VPS.
 
-Workers de negocio: **stubs deshabilitados**. Infraestructura inicial: config,
-HTTP `/health`, Docker y deploy local por SSH.
+Workers de negocio: OCR de gastos **activo** (Paddle + `qwen3.5:4b` + MySQL
+local). Monitor New Relic y digest matutino siguen **stubs deshabilitados**.
+
+Infraestructura: config, HTTP `/health`, Docker, MySQL bind `127.0.0.1` y
+deploy local por SSH.
+
+Secretos (API key VPS, DSN) van en `.env` de la laptop, no en Git. Copiar
+`.env.example`.
 
 ## Repo
 
@@ -18,7 +24,7 @@ HTTP `/health`, Docker y deploy local por SSH.
 ```
 cmd/orchestrator/     binario
 internal/config/      JSON, modelo qwen3.5:4b
-internal/workers/     stubs nr_monitor, morning_digest, ocr
+internal/workers/     ocr real; stubs nr_monitor, morning_digest
 internal/orchestrator HTTP + loop de despacho
 configs/              config.json (sin secretos)
 scripts/deploy.sh     pipeline local → laptop
