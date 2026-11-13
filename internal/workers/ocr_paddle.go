@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -19,8 +20,14 @@ func (w *OCRWorker) runPaddle(ctx context.Context, job *homelabJob) (string, flo
 	if err != nil {
 		return "", 0, err
 	}
-	script := w.cfg.OCRWorkDir + "/paddle_extract.py"
-	args := []string{"exec", w.cfg.PaddleContainer, "python3", script, localPath}
+	paddleDir := strings.TrimSpace(w.cfg.PaddleWorkDir)
+	if paddleDir == "" {
+		paddleDir = "/work"
+	}
+	base := filepath.Base(localPath)
+	script := filepath.Join(paddleDir, "paddle_extract.py")
+	paddlePath := filepath.Join(paddleDir, base)
+	args := []string{"exec", w.cfg.PaddleContainer, "python3", script, paddlePath}
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

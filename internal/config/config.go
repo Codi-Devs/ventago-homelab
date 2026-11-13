@@ -26,6 +26,7 @@ type Config struct {
 	MySQLDSN         string            `json:"mysql_dsn"`
 	PaddleContainer  string            `json:"paddle_container"`
 	OCRWorkDir       string            `json:"ocr_work_dir"`
+	PaddleWorkDir    string            `json:"paddle_work_dir"`
 	Workers          map[string]Worker `json:"workers"`
 }
 
@@ -74,6 +75,9 @@ func (c *Config) applyDefaults() {
 	}
 	if strings.TrimSpace(c.OCRWorkDir) == "" {
 		c.OCRWorkDir = "/opt/ventago-lab/ocr/work"
+	}
+	if strings.TrimSpace(c.PaddleWorkDir) == "" {
+		c.PaddleWorkDir = "/work"
 	}
 	if c.Workers == nil {
 		c.Workers = map[string]Worker{}

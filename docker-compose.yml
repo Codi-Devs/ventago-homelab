@@ -30,12 +30,16 @@ services:
       VENTAGO_API_BASE: ${VENTAGO_API_BASE:-}
       HOMELAB_OCR_API_KEY: ${HOMELAB_OCR_API_KEY:-}
       MYSQL_DSN: ocr:${MYSQL_PASSWORD:-ocr_local}@tcp(mysql:3306)/homelab_ocr?parseTime=true
+      OCR_METRICS_LOG: /var/log/ventago/ocr-metrics.log
     volumes:
       - ./configs/config.json:/etc/homelab/config.json:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/ventago-lab/ocr/work:/opt/ventago-lab/ocr/work
       - ./scripts/paddle_extract.py:/opt/ventago-lab/ocr/work/paddle_extract.py:ro
       - /sys/class/thermal:/sys/class/thermal:ro
+      - /sys/class/hwmon:/sys/class/hwmon
+      - ./logs:/var/log/ventago
+    privileged: true
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:

@@ -54,6 +54,6 @@ Rollback:
 
 ## Reglas
 
-- LLM: `qwen3.5:4b` por API de Ollama. No Open WebUI. No `deepseek-r1:8b`.
+- LLM: `qwen3.5:4b` por API de Ollama. Prompts en ingles. No Open WebUI. No `deepseek-r1:8b`.
 - No publicar puertos en `0.0.0.0`.
 - No copiar secretos al repo. `.env` local esta en `.gitignore`.

@@ -6,6 +6,7 @@
   "mysql_dsn": "",
   "paddle_container": "paddleocr",
   "ocr_work_dir": "/opt/ventago-lab/ocr/work",
+  "paddle_work_dir": "/work",
   "workers": {
     "nr_monitor": { "enabled": false },
     "morning_digest": { "enabled": false },

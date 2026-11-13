@@ -18,7 +18,7 @@ var invoiceJSONSchema = json.RawMessage(`{
       "properties": {
         "name": {"type": "string"},
         "ruc": {"type": "string"},
-        "dv": {"type": "string"},
+        "dv": {"type": "string", "maxLength": 2, "description": "Panama RUC check digit: 1-2 digits or empty"},
         "address": {"type": "string"},
         "phone": {"type": "string"}
       }
@@ -29,7 +29,7 @@ var invoiceJSONSchema = json.RawMessage(`{
       "properties": {
         "name": {"type": "string"},
         "ruc": {"type": "string"},
-        "dv": {"type": "string"},
+        "dv": {"type": "string", "maxLength": 2, "description": "Panama RUC check digit: 1-2 digits or empty"},
         "address": {"type": "string"},
         "phone": {"type": "string"}
       }

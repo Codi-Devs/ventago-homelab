@@ -27,7 +27,7 @@ func NewOCRWorker(cfg config.Config) *OCRWorker {
 	return &OCRWorker{
 		cfg:    cfg,
 		apiKey: strings.TrimSpace(os.Getenv("HOMELAB_OCR_API_KEY")),
-		http:   &http.Client{Timeout: 3 * time.Minute},
+		http:   &http.Client{Timeout: 6 * time.Minute},
 	}
 }
 
@@ -41,7 +41,7 @@ func (w *OCRWorker) Run(ctx context.Context) error {
 	if hot, err := thermalTooHot(); err != nil {
 		log.Printf("ocr thermal: %v", err)
 	} else if hot {
-		return fmt.Errorf("thermal pause: package >= 85C")
+		return fmt.Errorf("thermal pause: package >= 88C")
 	}
 	if err := w.ensureStore(); err != nil {
 		log.Printf("ocr mysql: %v", err)
@@ -69,51 +69,70 @@ func (w *OCRWorker) processOne(ctx context.Context) error {
 	if job == nil {
 		return nil
 	}
+	restoreFan := boostOCRFan()
+	defer restoreFan()
 	if w.store != nil {
 		_ = w.store.MarkSeen(job.ID, job.Route)
 	}
 
-	text := strings.TrimSpace(job.ExtractedText)
-	if strings.EqualFold(job.Route, "ocr") && text == "" {
-		ocrText, conf, ocrErr := w.runPaddle(ctx, job)
-		if ocrErr != nil {
-			_ = w.fail(ctx, job.ID, ocrErr.Error())
+	stopPaddle := watchPhase(job.ID, "paddle")
+	ocrText, conf, ocrErr := w.runPaddle(ctx, job)
+	stopPaddle(fmt.Sprintf("ok=%t confidence=%.3f chars=%d err=%q", ocrErr == nil, conf, len(ocrText), errString(ocrErr)))
+	if ocrErr != nil {
+		if isTransientAPIError(ocrErr) {
 			return ocrErr
 		}
-		updated, resErr := w.postOCRResult(ctx, job.ID, ocrText, conf)
-		if resErr != nil {
-			_ = w.fail(ctx, job.ID, resErr.Error())
+		_ = w.fail(ctx, job.ID, ocrErr.Error())
+		return ocrErr
+	}
+	if w.store != nil {
+		_ = w.store.SaveExtracted(job.ID, ocrText)
+	}
+	if _, resErr := w.postOCRResult(ctx, job.ID, ocrText, conf); resErr != nil {
+		if isTransientAPIError(resErr) {
+			log.Printf("ocr job %d: ocr-result transient, will retry: %v", job.ID, resErr)
 			return resErr
 		}
-		text = strings.TrimSpace(updated.ExtractedText)
-		if text == "" {
-			text = ocrText
+		_ = w.fail(ctx, job.ID, resErr.Error())
+		return resErr
+	}
+	return nil
+}
+
+func (w *OCRWorker) retryPendingCompletes(ctx context.Context) error {
+	if w.store == nil {
+		return nil
+	}
+	pending, err := w.store.ListPendingComplete()
+	if err != nil {
+		log.Printf("ocr pending complete list: %v", err)
+		return nil
+	}
+	for _, item := range pending {
+		if err := w.finishComplete(ctx, item.JobID, json.RawMessage(item.ResultJSON)); err != nil {
+			return err
 		}
 	}
-	if text == "" {
-		err := fmt.Errorf("empty invoice text")
-		_ = w.fail(ctx, job.ID, err.Error())
-		return err
-	}
+	return nil
+}
 
-	parsed, parseErr := w.parseWithLLM(ctx, text, "")
-	if parseErr != nil {
-		parsed, parseErr = w.parseWithLLM(ctx, text, parseErr.Error())
+func (w *OCRWorker) finishComplete(ctx context.Context, jobID int64, parsed json.RawMessage) error {
+	if w.store != nil {
+		_ = w.store.SaveParsed(jobID, string(parsed))
 	}
-	if parseErr != nil {
-		_ = w.fail(ctx, job.ID, parseErr.Error())
+	if err := w.complete(ctx, jobID, parsed); err != nil {
+		if isTransientAPIError(err) {
+			log.Printf("ocr job %d: complete transient, will retry without failing job: %v", jobID, err)
+			return err
+		}
+		_ = w.fail(ctx, jobID, err.Error())
 		if w.store != nil {
-			_ = w.store.MarkError(job.ID, parseErr.Error())
+			_ = w.store.MarkError(jobID, err.Error())
 		}
-		return parseErr
-	}
-
-	if err := w.complete(ctx, job.ID, parsed); err != nil {
-		_ = w.fail(ctx, job.ID, err.Error())
 		return err
 	}
 	if w.store != nil {
-		_ = w.store.MarkDone(job.ID)
+		_ = w.store.MarkDone(jobID)
 	}
 	return nil
 }
@@ -141,7 +160,7 @@ type apiEnvelope struct {
 
 func (w *OCRWorker) lease(ctx context.Context) (*homelabJob, error) {
 	var env apiEnvelope
-	if err := w.doJSON(ctx, http.MethodGet, "/api/v1/internal/homelab/ocr/lease", nil, &env); err != nil {
+	if err := w.doJSON(ctx, http.MethodGet, "/api/v1/internal/homelab/ocr/lease?kind=ocr", nil, &env); err != nil {
 		return nil, err
 	}
 	if !env.Success {
@@ -258,4 +277,11 @@ func (w *OCRWorker) downloadFile(ctx context.Context, job *homelabJob) (string, 
 		return "", err
 	}
 	return dest, nil
+}
+
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }

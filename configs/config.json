@@ -2,10 +2,11 @@
   "http_addr": ":8080",
   "ollama_host": "http://ollama:11434",
   "ollama_model": "qwen3.5:4b",
-  "ventago_api_base": "",
+  "ventago_api_base": "https://invoice-vg.tecodigi.com",
   "mysql_dsn": "",
   "paddle_container": "paddleocr",
   "ocr_work_dir": "/opt/ventago-lab/ocr/work",
+  "paddle_work_dir": "/work",
   "workers": {
     "nr_monitor": { "enabled": false },
     "morning_digest": { "enabled": false },
