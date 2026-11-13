@@ -16,9 +16,10 @@ log() { echo "$(date -u +%FT%TZ) mysql-backup-pull $*"; }
 
 mkdir -p "$BACKUP_DIR/full" "$BACKUP_DIR/binlog" "$BACKUP_DIR/binlog-open" "$BACKUP_DIR/monthly"
 
+# rrsync already confines this login to the spool out/ directory.
 if ! rsync -a --partial \
   -e "ssh -i ${VPS_SSH_KEY} -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
-  "${VPS_USER}@${VPS_HOST}:/var/backups/mysql-spool/out/" \
+  "${VPS_USER}@${VPS_HOST}:" \
   "${BACKUP_DIR}/"
 then
   log "rsync_failed"
