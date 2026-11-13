@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Restaura la última foto y el diario posterior en un MySQL temporal.
 # Borra el temporal al terminar. No publica puertos y no toca las copias.
-set -u
+set -u -o pipefail
 
 ENV_FILE=${MYSQL_BACKUP_ENV:-/home/ventago/homelab/mysql-backup.env}
 # shellcheck disable=SC1090
@@ -45,8 +45,8 @@ docker run -d --name "$NAME" \
   --innodb-buffer-pool-size=268435456 >/dev/null || fail "docker_run"
 
 ready=0
-for _ in $(seq 1 30); do
-  if docker exec -e MYSQL_PWD="$ROOTPW" "$NAME" mysqladmin -uroot ping --silent >/dev/null 2>&1; then
+for _ in $(seq 1 90); do
+  if docker exec -e MYSQL_PWD="$ROOTPW" "$NAME" mysql -uroot -h 127.0.0.1 --protocol=tcp -N -e 'SELECT 1' >/dev/null 2>&1; then
     ready=1
     break
   fi
@@ -91,7 +91,7 @@ if [[ ${#binlog_args[@]} -gt 0 ]]; then
   docker run --rm -v "$WORKDIR:/work:ro" mysql:8.0.43 \
     mysqlbinlog "${binlog_args[@]/$WORKDIR//work}" \
     | docker exec -i -e MYSQL_PWD="$ROOTPW" "$NAME" mysql -uroot \
-    || log "binlog_apply_partial"
+    || fail "binlog_apply"
 fi
 
 mysql_exec -N -e "SELECT table_schema, COUNT(*) FROM information_schema.tables WHERE table_schema NOT IN ('mysql','sys','information_schema','performance_schema') GROUP BY table_schema" \

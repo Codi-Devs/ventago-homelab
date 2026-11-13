@@ -31,6 +31,13 @@ monthly_days=${MONTHLY_DAYS:-366}
 find "$BACKUP_DIR/full" -mindepth 1 -maxdepth 1 -type d -mtime +"$keep_days" -exec rm -rf {} +
 find "$BACKUP_DIR/binlog" -type f -name '*.zst.age' -mtime +"$keep_days" -delete
 find "$BACKUP_DIR/monthly" -mindepth 1 -maxdepth 1 -type d -mtime +"$monthly_days" -exec rm -rf {} +
+while IFS= read -r open; do
+  [[ -n "$open" ]] || continue
+  if [[ -f "$BACKUP_DIR/binlog/$(basename "$open")" ]]; then
+    rm -f "$open"
+  fi
+done < <(find "$BACKUP_DIR/binlog-open" -type f -name '*.zst.age')
+find "$BACKUP_DIR/binlog-open" -type f -name '*.zst.age' -mtime +"$keep_days" -delete
 
 # El día 1 de Panamá se conserva un año, fuera de la poda de 35 días.
 while IFS= read -r dir; do
@@ -44,8 +51,16 @@ while IFS= read -r dir; do
   fi
 done < <(find "$BACKUP_DIR/full" -mindepth 1 -maxdepth 1 -type d | sort)
 
-if ! curl -fsS -m 10 --retry 2 "$HC_PULL_URL" >/dev/null; then
-  log "healthcheck_pull_failed"
+fresh=$(find "$BACKUP_DIR/binlog" "$BACKUP_DIR/binlog-open" -type f -name '*.zst.age' -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f1)
+if [[ -z "$fresh" ]]; then
+  log "binlog_missing"
+else
+  age_sec=$(( $(date +%s) - ${fresh%.*} ))
+  if (( age_sec < 600 )); then
+    curl -fsS -m 10 --retry 2 "$HC_PULL_URL" >/dev/null || log "healthcheck_pull_failed"
+  else
+    log "binlog_stale seconds=$age_sec"
+  fi
 fi
 
 newest=$(find "$BACKUP_DIR/full" -mindepth 2 -maxdepth 2 -name manifest.json -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-)

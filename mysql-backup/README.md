@@ -19,8 +19,7 @@ install -m 600 /dev/null /home/ventago/homelab/mysql-backup.env
 # la clave privada age, chmod 600, en AGE_IDENTITY
 ```
 
-Tres checks en Healthchecks, avisando por correo a oscar@tecodigi.com,
-camila@tecodigi.com e info@tecodigi.com:
+Tres checks en Healthchecks. Los correos se configuran en esa cuenta, no en este repo:
 
 | Check | Periodo | Gracia |
 |---|---|---|
@@ -37,6 +36,3 @@ sudo cp mysql-backup/mysql-backup-pull.service mysql-backup/mysql-backup-pull.ti
 sudo systemctl daemon-reload
 sudo systemctl enable --now mysql-backup-pull.timer mysql-backup-restore.timer
 ```
-
-El disco de esta laptop no está cifrado. La clave privada queda aquí para
-que la prueba semanal pueda correr. Eso está aceptado.
