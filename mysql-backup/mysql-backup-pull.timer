@@ -1,0 +1,11 @@
+[Unit]
+Description=Jala las copias de MySQL cada minuto
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+AccuracySec=10s
+Unit=mysql-backup-pull.service
+
+[Install]
+WantedBy=timers.target

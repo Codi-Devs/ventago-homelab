@@ -1,0 +1,10 @@
+[Unit]
+Description=Prueba de restauracion de MySQL, domingo 04:00 Panama
+
+[Timer]
+OnCalendar=Sun *-*-* 09:00:00 UTC
+Persistent=true
+Unit=mysql-backup-restore.service
+
+[Install]
+WantedBy=timers.target

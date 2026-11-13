@@ -1,0 +1,10 @@
+[Unit]
+Description=Jala las copias cifradas de MySQL del VPS
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ventago
+Environment=MYSQL_BACKUP_ENV=/home/ventago/homelab/mysql-backup.env
+ExecStart=/home/ventago/homelab/orchestrator/mysql-backup/pull.sh
