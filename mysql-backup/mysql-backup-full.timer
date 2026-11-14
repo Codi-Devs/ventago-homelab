@@ -1,0 +1,12 @@
+[Unit]
+Description=Jala la foto de MySQL cada hora
+
+[Timer]
+OnBootSec=5min
+OnCalendar=*-*-* *:20:00 UTC
+Persistent=true
+AccuracySec=1min
+Unit=mysql-backup-full.service
+
+[Install]
+WantedBy=timers.target

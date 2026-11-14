@@ -14,14 +14,27 @@ source "$ENV_FILE"
 
 log() { echo "$(date -u +%FT%TZ) mysql-backup-pull $*"; }
 
-mkdir -p "$BACKUP_DIR/full" "$BACKUP_DIR/binlog" "$BACKUP_DIR/binlog-open" "$BACKUP_DIR/monthly"
+# Una SSH muda muere en ~30 s. El jalón completo no pasa de 60 s.
+# La foto va en pull-full.sh y no tiene límite de tiempo.
+ssh_rsh="ssh -i ${VPS_SSH_KEY} -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=2"
 
 # rrsync already confines this login to the spool out/ directory.
-if ! rsync -a --partial \
-  -e "ssh -i ${VPS_SSH_KEY} -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
-  "${VPS_USER}@${VPS_HOST}:" \
-  "${BACKUP_DIR}/"
-then
+sync_spool() {
+  local remote="$1" dest="$2"
+  rsync -a --partial \
+    -e "$ssh_rsh" \
+    "${VPS_USER}@${VPS_HOST}:${remote}" \
+    "$dest"
+}
+
+mkdir -p "$BACKUP_DIR/full" "$BACKUP_DIR/binlog" "$BACKUP_DIR/binlog-open" "$BACKUP_DIR/monthly"
+
+export ssh_rsh VPS_USER VPS_HOST BACKUP_DIR
+export -f sync_spool
+if ! timeout --signal=TERM --kill-after=10s 60 bash -c '
+  sync_spool "binlog/" "$BACKUP_DIR/binlog/" &&
+  sync_spool "binlog-open/" "$BACKUP_DIR/binlog-open/"
+'; then
   log "rsync_failed"
   exit 1
 fi
@@ -29,9 +42,7 @@ fi
 keep_days=${KEEP_DAYS:-35}
 monthly_days=${MONTHLY_DAYS:-366}
 
-find "$BACKUP_DIR/full" -mindepth 1 -maxdepth 1 -type d -mtime +"$keep_days" -exec rm -rf {} +
 find "$BACKUP_DIR/binlog" -type f -name '*.zst.age' -mtime +"$keep_days" -delete
-find "$BACKUP_DIR/monthly" -mindepth 1 -maxdepth 1 -type d -mtime +"$monthly_days" -exec rm -rf {} +
 while IFS= read -r open; do
   [[ -n "$open" ]] || continue
   if [[ -f "$BACKUP_DIR/binlog/$(basename "$open")" ]]; then
@@ -39,18 +50,6 @@ while IFS= read -r open; do
   fi
 done < <(find "$BACKUP_DIR/binlog-open" -type f -name '*.zst.age')
 find "$BACKUP_DIR/binlog-open" -type f -name '*.zst.age' -mtime +"$keep_days" -delete
-
-# El día 1 de Panamá se conserva un año, fuera de la poda de 35 días.
-while IFS= read -r dir; do
-  [[ -n "$dir" ]] || continue
-  base=$(basename "$dir")
-  day=${base:8:2}
-  if [[ "$day" == "01" && -f "$dir/manifest.json" ]]; then
-    month=${base:0:7}
-    mkdir -p "$BACKUP_DIR/monthly/$month"
-    rsync -a "$dir/" "$BACKUP_DIR/monthly/$month/"
-  fi
-done < <(find "$BACKUP_DIR/full" -mindepth 1 -maxdepth 1 -type d | sort)
 
 fresh=$(find "$BACKUP_DIR/binlog" "$BACKUP_DIR/binlog-open" -type f -name '*.zst.age' -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f1)
 if [[ -z "$fresh" ]]; then
@@ -63,6 +62,21 @@ else
     log "binlog_stale seconds=$age_sec"
   fi
 fi
+
+find "$BACKUP_DIR/full" -mindepth 1 -maxdepth 1 -type d -mtime +"$keep_days" -exec rm -rf {} +
+find "$BACKUP_DIR/monthly" -mindepth 1 -maxdepth 1 -type d -mtime +"$monthly_days" -exec rm -rf {} +
+
+# El día 1 de Panamá se conserva un año, fuera de la poda de 35 días.
+while IFS= read -r dir; do
+  [[ -n "$dir" ]] || continue
+  base=$(basename "$dir")
+  day=${base:8:2}
+  if [[ "$day" == "01" && -f "$dir/manifest.json" ]]; then
+    month=${base:0:7}
+    mkdir -p "$BACKUP_DIR/monthly/$month"
+    rsync -a "$dir/" "$BACKUP_DIR/monthly/$month/"
+  fi
+done < <(find "$BACKUP_DIR/full" -mindepth 1 -maxdepth 1 -type d | sort)
 
 newest=$(find "$BACKUP_DIR/full" -mindepth 2 -maxdepth 2 -name manifest.json -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-)
 if [[ -n "$newest" ]]; then
