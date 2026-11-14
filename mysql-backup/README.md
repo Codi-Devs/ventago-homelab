@@ -27,12 +27,20 @@ Tres checks en Healthchecks. Los correos se configuran en esa cuenta, no en este
 | foto | 1 día | 2 h |
 | restore | 7 días | 1 día |
 
+Una conexión que no responde se corta a los 30 segundos. El jalón del
+binlog no pasa de 60 segundos.
+
+La foto va por `pull-full.sh`, una vez por hora, sin límite de tiempo.
+Si dejan de llegar bytes, esa descarga se corta y sigue desde el último
+byte. Una base más grande tarda más minutos y termina igual.
+
 La cuenta `ventago` tiene que poder usar Docker para la prueba semanal.
 
 ```sh
 sudo cp mysql-backup/mysql-backup-pull.service mysql-backup/mysql-backup-pull.timer \
+  mysql-backup/mysql-backup-full.service mysql-backup/mysql-backup-full.timer \
   mysql-backup/mysql-backup-restore.service mysql-backup/mysql-backup-restore.timer \
   /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now mysql-backup-pull.timer mysql-backup-restore.timer
+sudo systemctl enable --now mysql-backup-pull.timer mysql-backup-full.timer mysql-backup-restore.timer
 ```

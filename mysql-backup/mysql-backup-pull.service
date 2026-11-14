@@ -8,3 +8,4 @@ Type=oneshot
 User=ventago
 Environment=MYSQL_BACKUP_ENV=/home/ventago/homelab/mysql-backup.env
 ExecStart=/home/ventago/homelab/orchestrator/mysql-backup/pull.sh
+TimeoutStartSec=90
