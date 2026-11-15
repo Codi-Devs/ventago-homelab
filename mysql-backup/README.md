@@ -35,6 +35,8 @@ Si dejan de llegar bytes, esa descarga se corta y sigue desde el último
 byte. Una base más grande tarda más minutos y termina igual.
 
 La cuenta `ventago` tiene que poder usar Docker para la prueba semanal.
+La imagen `mysql:8.0.43` no trae `mysqlbinlog`. La prueba construye
+`mysql-backup-binlog:8.0.43` la primera vez, a partir de `Dockerfile.binlog`.
 
 ```sh
 sudo cp mysql-backup/mysql-backup-pull.service mysql-backup/mysql-backup-pull.timer \

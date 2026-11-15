@@ -1,0 +1,17 @@
+FROM mysql:8.0.43
+
+USER root
+# mysql-community-client 8.0.43. The server image has no mysqlbinlog.
+ARG CLIENT_SHA256=819665ba0bc2fe8d8eb0a9bb4db4adc88e720dd5eaa652120c27f1f2b49bd9ae
+RUN microdnf install -y curl cpio \
+    && microdnf clean all \
+    && curl -fsSL -o /tmp/mysql-client.rpm \
+        https://repo.mysql.com/yum/mysql-8.0-community/el/9/x86_64/mysql-community-client-8.0.43-1.el9.x86_64.rpm \
+    && echo "${CLIENT_SHA256}  /tmp/mysql-client.rpm" | sha256sum -c - \
+    && cd /tmp \
+    && rpm2cpio /tmp/mysql-client.rpm | cpio -id ./usr/bin/mysqlbinlog \
+    && install -m 755 /tmp/usr/bin/mysqlbinlog /usr/local/bin/mysqlbinlog \
+    && rm -rf /tmp/mysql-client.rpm /tmp/usr \
+    && mysqlbinlog --version
+
+USER mysql

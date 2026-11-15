@@ -12,6 +12,8 @@ source "$ENV_FILE"
 : "${HC_RESTORE_URL:?}"
 
 NAME=mysql-backup-restore-test
+BINLOG_IMAGE=mysql-backup-binlog:8.0.43
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 WORKDIR=$(mktemp -d /tmp/mysql-backup-restore.XXXXXX)
 ROOTPW=$(openssl rand -hex 16)
 started=$(date +%s)
@@ -42,7 +44,8 @@ docker rm -f "$NAME" >/dev/null 2>&1 || true
 docker run -d --name "$NAME" \
   -e MYSQL_ROOT_PASSWORD="$ROOTPW" \
   mysql:8.0.43 \
-  --innodb-buffer-pool-size=268435456 >/dev/null || fail "docker_run"
+  --innodb-buffer-pool-size=268435456 \
+  --max-allowed-packet=1073741824 >/dev/null || fail "docker_run"
 
 ready=0
 for _ in $(seq 1 90); do
@@ -61,7 +64,7 @@ log_pos=$(printf '%s\n' "$pos_line" | sed -n "s/.*\\(SOURCE_LOG_POS\\|MASTER_LOG
 [[ -n "$log_file" && -n "$log_pos" ]] || fail "bad_binlog_position"
 
 age -d -i "$AGE_IDENTITY" "$dump_dir/all.sql.zst.age" | zstd -d \
-  | docker exec -i -e MYSQL_PWD="$ROOTPW" "$NAME" mysql -uroot || fail "load_dump"
+  | docker exec -i -e MYSQL_PWD="$ROOTPW" "$NAME" mysql -uroot --max-allowed-packet=1073741824 || fail "load_dump"
 
 declare -A seen=()
 binlog_args=()
@@ -88,9 +91,12 @@ while IFS= read -r enc; do
 done < <(find "$BACKUP_DIR/binlog" -type f -name 'binlog.*.zst.age' | sort; find "$BACKUP_DIR/binlog-open" -type f -name 'binlog.*.zst.age' | sort)
 
 if [[ ${#binlog_args[@]} -gt 0 ]]; then
-  docker run --rm -v "$WORKDIR:/work:ro" mysql:8.0.43 \
-    mysqlbinlog "${binlog_args[@]/$WORKDIR//work}" \
-    | docker exec -i -e MYSQL_PWD="$ROOTPW" "$NAME" mysql -uroot \
+  if ! docker image inspect "$BINLOG_IMAGE" >/dev/null 2>&1; then
+    docker build -t "$BINLOG_IMAGE" -f "$SCRIPT_DIR/Dockerfile.binlog" "$SCRIPT_DIR" || fail "binlog_image"
+  fi
+  docker run --rm --user "$(id -u):$(id -g)" --entrypoint mysqlbinlog -v "$WORKDIR:/work:ro" "$BINLOG_IMAGE" \
+    "${binlog_args[@]/$WORKDIR//work}" \
+    | docker exec -i -e MYSQL_PWD="$ROOTPW" "$NAME" mysql -uroot --max-allowed-packet=1073741824 \
     || fail "binlog_apply"
 fi
 
